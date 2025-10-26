@@ -4,6 +4,11 @@ platform: docker
 build:
   dockerfile: Dockerfile
 
+
+run:
+  containerPort: 8080
+  servicePort: 80
+
 deploy:
   instances: 1
   resources:
@@ -16,13 +21,15 @@ services:
     protocol: http
     healthcheck:
       path: /health
-      interval: 60s    # Увеличиваем интервал
-      timeout: 30s     # Увеличиваем таймаут
-      initial_delay: 120s  # Даем больше времени на запуск
-      
+      interval: 30s   
+      timeout: 10s
+      initial_delay: 30s
+
 env:
   - name: SERVER_HOST
     value: "0.0.0.0"
+  - name: SERVER_PORT    
+    value: "8080"
   - name: LOG_LEVEL
     value: "info"
   - name: LOG_FORMAT
