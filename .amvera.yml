@@ -16,9 +16,10 @@ services:
     protocol: http
     healthcheck:
       path: /health
-      interval: 30s
-      timeout: 10s
-
+      interval: 60s    # Увеличиваем интервал
+      timeout: 30s     # Увеличиваем таймаут
+      initial_delay: 120s  # Даем больше времени на запуск
+      
 env:
   - name: SERVER_HOST
     value: "0.0.0.0"
