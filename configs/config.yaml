@@ -1,9 +1,9 @@
 database:
   host: "localhost"
   port: 5432
-  user: "postgres"           # стандартный пользователь PostgreSQL
-  password: "password"       # пароль который ты использовал при создании
-  name: "tg_parser_bot"      # или другое имя БД если менял
+  user: "postgres"
+  password: "password"
+  name: "tg_parser_bot"
   ssl_mode: "disable"
 
 telegram:
@@ -28,7 +28,6 @@ logger:
   format: "json"
   file_path: "logs/app.log"
 
-# ДОБАВИТЬ ЭТОТ РАЗДЕЛ:
 auth:
   jwt_secret: "tg-parser-bot-super-secret-key-2024-change-me"
   jwt_duration: 24

@@ -6,6 +6,9 @@ RUN apk add --no-cache nodejs npm
 WORKDIR /app
 COPY . .
 
+# ПРОСТО УДАЛЯЕМ config.yaml - приложение будет использовать env variables
+RUN rm -f configs/config.yaml
+
 RUN go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -o web-server ./cmd/web/main.go
 RUN CGO_ENABLED=0 GOOS=linux go build -o parser ./cmd/parser/main.go

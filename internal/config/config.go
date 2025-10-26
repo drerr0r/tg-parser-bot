@@ -11,6 +11,13 @@ import (
 
 // LoadConfig загружает конфигурацию из YAML файла
 func LoadConfig(path string) (*models.Config, error) {
+	fmt.Printf("=== DEBUG CONFIG LOADING ===\n")
+	fmt.Printf("Config file path: %s\n", path)
+	fmt.Printf("DB_HOST from env: '%s'\n", os.Getenv("DB_HOST"))
+	fmt.Printf("DB_PORT from env: '%s'\n", os.Getenv("DB_PORT"))
+	fmt.Printf("DB_NAME from env: '%s'\n", os.Getenv("DB_NAME"))
+	fmt.Printf("DB_USER from env: '%s'\n", os.Getenv("DB_USER"))
+	fmt.Printf("============================\n")
 	config := &models.Config{}
 
 	// Читаем файл
@@ -31,6 +38,7 @@ func LoadConfig(path string) (*models.Config, error) {
 	loadFromEnv(config)
 
 	return config, nil
+
 }
 
 // loadFromEnv переопределяет конфиг из переменных окружения
@@ -116,6 +124,12 @@ func loadFromEnv(config *models.Config) {
 	if filePath := os.Getenv("LOG_FILE_PATH"); filePath != "" {
 		config.Logger.FilePath = filePath
 	}
+	fmt.Printf("=== AFTER ENV OVERRIDE ===\n")
+	fmt.Printf("Final DB Host: '%s'\n", config.Database.Host)
+	fmt.Printf("Final DB Port: %d\n", config.Database.Port)
+	fmt.Printf("Final DB Name: '%s'\n", config.Database.Name)
+	fmt.Printf("Final DB User: '%s'\n", config.Database.User)
+	fmt.Printf("==========================\n")
 }
 
 // setDefaults устанавливает значения по умолчанию
