@@ -1,0 +1,32 @@
+name: tg-parser-bot
+platform: docker
+
+build:
+  dockerfile: Dockerfile
+
+deploy:
+  instances: 1
+  resources:
+    memory: 512
+    cpu: 500
+
+services:
+  - name: web
+    port: 8080
+    protocol: http
+    healthcheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+
+env:
+  - name: SERVER_HOST
+    value: "0.0.0.0"
+  - name: LOG_LEVEL
+    value: "info"
+  - name: LOG_FORMAT
+    value: "json"
+
+volumes:
+  - name: session-data
+    path: /app

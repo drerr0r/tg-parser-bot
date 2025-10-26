@@ -16,11 +16,16 @@ import (
 type TelegramPublisher struct {
 	bot    *tgbotapi.BotAPI
 	logger *zap.SugaredLogger
+	cfg    *models.TelegramConfig
 }
 
 // NewTelegramPublisher создает новый публикатор для Telegram
-func NewTelegramPublisher(botToken string, logger *zap.SugaredLogger) (*TelegramPublisher, error) {
-	bot, err := tgbotapi.NewBotAPI(botToken)
+func NewTelegramPublisher(cfg *models.TelegramConfig, logger *zap.SugaredLogger) (*TelegramPublisher, error) {
+	if cfg.BotToken == "" {
+		return nil, fmt.Errorf("bot_token не указан в конфигурации")
+	}
+
+	bot, err := tgbotapi.NewBotAPI(cfg.BotToken)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка создания бота Telegram: %v", err)
 	}
@@ -30,6 +35,7 @@ func NewTelegramPublisher(botToken string, logger *zap.SugaredLogger) (*Telegram
 	return &TelegramPublisher{
 		bot:    bot,
 		logger: logger,
+		cfg:    cfg,
 	}, nil
 }
 
@@ -37,10 +43,15 @@ func NewTelegramPublisher(botToken string, logger *zap.SugaredLogger) (*Telegram
 func (p *TelegramPublisher) Publish(ctx context.Context, post *models.Post, targetChannel string) error {
 	p.logger.Infof("Публикация поста %d в канал %s", post.ID, targetChannel)
 
-	// Конвертируем channel name в ChatID
-	chatID, err := p.getChatID(targetChannel)
+	// Всегда используем target_channel из конфига, игнорируя переданный параметр
+	if p.cfg.TargetChannel == "" {
+		return fmt.Errorf("target_channel не указан в конфигурации")
+	}
+
+	// Парсим ChatID из конфига
+	chatID, err := strconv.ParseInt(p.cfg.TargetChannel, 10, 64)
 	if err != nil {
-		return fmt.Errorf("ошибка получения ChatID для %s: %v", targetChannel, err)
+		return fmt.Errorf("ошибка парсинга ChatID из конфига %s: %v", p.cfg.TargetChannel, err)
 	}
 
 	// Подготавливаем контент
@@ -53,68 +64,6 @@ func (p *TelegramPublisher) Publish(ctx context.Context, post *models.Post, targ
 
 	// Публикуем текстовое сообщение
 	return p.publishText(chatID, content)
-}
-
-// getChatID конвертирует channel name или ID в int64
-func (p *TelegramPublisher) getChatID(target string) (int64, error) {
-	// Если target начинается с @, это username канала
-	if strings.HasPrefix(target, "@") {
-		// Для каналов по username нужно отправить сообщение и получить chat_id из ответа
-		// Или использовать метод getUpdates чтобы найти канал
-		chatID, err := p.findChatIDByUsername(target)
-		if err != nil {
-			return 0, fmt.Errorf("не удалось найти chat_id для %s: %v", target, err)
-		}
-		return chatID, nil
-	}
-
-	// Если target - числовой ID
-	chatID, err := strconv.ParseInt(target, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("неверный формат ChatID: %s", target)
-	}
-
-	return chatID, nil
-}
-
-// findChatIDByUsername находит chat_id канала по username
-func (p *TelegramPublisher) findChatIDByUsername(username string) (int64, error) {
-	// Метод 1: Попробуем отправить тестовое сообщение и получить chat_id из ответа
-	msg := tgbotapi.NewMessageToChannel(username, "test")
-	sentMsg, err := p.bot.Send(msg)
-	if err != nil {
-		// Метод 2: Используем getUpdates чтобы найти канал
-		return p.getChatIDFromUpdates(username)
-	}
-	return sentMsg.Chat.ID, nil
-}
-
-// getChatIDFromUpdates ищет chat_id в списке обновлений
-func (p *TelegramPublisher) getChatIDFromUpdates(username string) (int64, error) {
-	updates, err := p.bot.GetUpdates(tgbotapi.UpdateConfig{
-		Offset:  0,
-		Limit:   100,
-		Timeout: 10,
-	})
-	if err != nil {
-		return 0, fmt.Errorf("ошибка получения обновлений: %v", err)
-	}
-
-	// Ищем канал в обновлениях
-	for _, update := range updates {
-		if update.ChannelPost != nil && update.ChannelPost.Chat != nil {
-			if update.ChannelPost.Chat.UserName == strings.TrimPrefix(username, "@") {
-				return update.ChannelPost.Chat.ID, nil
-			}
-		}
-		if update.Message != nil && update.Message.Chat != nil {
-			if update.Message.Chat.UserName == strings.TrimPrefix(username, "@") {
-				return update.Message.Chat.ID, nil
-			}
-		}
-	}
-
-	return 0, fmt.Errorf("канал %s не найден в обновлениях. Убедитесь, что бот добавлен в канал", username)
 }
 
 // publishWithMedia публикует пост с медиа

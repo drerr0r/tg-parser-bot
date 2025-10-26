@@ -8,14 +8,24 @@ import (
 	"go.uber.org/zap"
 )
 
-func SetupRoutes(ruleRepo *storage.RuleRepository, postRepo *storage.PostRepository, userRepo *storage.UserRepository, logger *zap.SugaredLogger, cfg *models.Config) http.Handler {
-	handlers := NewHandlers(ruleRepo, postRepo, userRepo, logger, cfg)
+func SetupRoutes(ruleRepo *storage.RuleRepository, postRepo *storage.PostRepository, userRepo *storage.UserRepository, logRepo *storage.LogRepository, logger *zap.SugaredLogger, cfg *models.Config) http.Handler {
+	handlers := NewHandlers(ruleRepo, postRepo, userRepo, logRepo, logger, cfg)
 	mux := http.NewServeMux()
+
+	// Явно обрабатываем OPTIONS для ВСЕХ API endpoints
+	mux.HandleFunc("OPTIONS /api/{rest...}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.WriteHeader(http.StatusOK)
+	})
 
 	// Auth API
 	mux.HandleFunc("POST /api/auth/login", handlers.Login)
+	mux.HandleFunc("GET /api/auth/me", handlers.GetCurrentUser)
 
-	// Health check
+	// Health check (должны быть ДО auth middleware)
 	mux.HandleFunc("GET /health", handlers.HealthCheck)
 	mux.HandleFunc("GET /api/health", handlers.HealthCheck)
 
@@ -31,16 +41,16 @@ func SetupRoutes(ruleRepo *storage.RuleRepository, postRepo *storage.PostReposit
 	// Stats
 	mux.HandleFunc("GET /api/stats", handlers.GetStats)
 
-	// User API
-	mux.HandleFunc("GET /api/auth/me", handlers.GetCurrentUser)
-
-	// Frontend - отдаем информационное сообщение
+	// Frontend
 	mux.HandleFunc("GET /", handlers.ServeFrontend)
 
-	// ПРАВИЛЬНЫЙ ПОРЯДОК: CORS -> Logging -> Auth
+	// ВАЖНО: CORS должен быть ПЕРВЫМ в цепочке
 	handler := CORSMiddleware(mux)
 	handler = LoggingMiddleware(logger)(handler)
 	handler = AuthMiddleware(cfg, logger)(handler)
+
+	// Logs API
+	mux.HandleFunc("GET /api/logs", handlers.GetLogs)
 
 	return handler
 }

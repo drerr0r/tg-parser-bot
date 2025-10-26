@@ -17,15 +17,17 @@ type Handlers struct {
 	ruleRepo *storage.RuleRepository
 	postRepo *storage.PostRepository
 	userRepo *storage.UserRepository
+	logRepo  *storage.LogRepository
 	logger   *zap.SugaredLogger
 	cfg      *models.Config
 }
 
-func NewHandlers(ruleRepo *storage.RuleRepository, postRepo *storage.PostRepository, userRepo *storage.UserRepository, logger *zap.SugaredLogger, cfg *models.Config) *Handlers {
+func NewHandlers(ruleRepo *storage.RuleRepository, postRepo *storage.PostRepository, userRepo *storage.UserRepository, logRepo *storage.LogRepository, logger *zap.SugaredLogger, cfg *models.Config) *Handlers {
 	return &Handlers{
 		ruleRepo: ruleRepo,
 		postRepo: postRepo,
 		userRepo: userRepo,
+		logRepo:  logRepo,
 		logger:   logger,
 		cfg:      cfg,
 	}
@@ -180,17 +182,67 @@ func (h *Handlers) GetPosts(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetStats(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Простая статистика
-	rules, err := h.ruleRepo.GetActiveRules(ctx)
+	// Получаем все правила
+	allRules, err := h.ruleRepo.List(ctx, 1000, 0)
 	if err != nil {
-		h.sendError(w, http.StatusInternalServerError, "Ошибка получения статистики: %v", err)
+		h.sendError(w, http.StatusInternalServerError, "Ошибка получения статистики правил: %v", err)
 		return
 	}
 
+	// Считаем активные/неактивные правила
+	activeRules := 0
+	inactiveRules := 0
+	for _, rule := range allRules {
+		if rule.IsActive {
+			activeRules++
+		} else {
+			inactiveRules++
+		}
+	}
+
+	// Получаем все посты для статистики
+	allPosts, err := h.postRepo.GetPosts(ctx, 10000, 0)
+	if err != nil {
+		h.sendError(w, http.StatusInternalServerError, "Ошибка получения статистики постов: %v", err)
+		return
+	}
+
+	// Считаем статистику по постам
+	totalPosts := len(allPosts)
+	telegramPosts := 0
+	vkPosts := 0
+	successPosts := 0
+	failedPosts := 0
+
+	for _, post := range allPosts {
+		if post.PublishedTelegram {
+			telegramPosts++
+		}
+		if post.PublishedVK {
+			vkPosts++
+		}
+		if post.PublishError != "" {
+			failedPosts++
+		} else {
+			successPosts++
+		}
+	}
+
 	stats := map[string]interface{}{
-		"active_rules": len(rules),
-		"service":      "tg-parser-bot",
-		"status":       "running",
+		// Основная статистика
+		"rules_count":    len(allRules),
+		"posts_count":    totalPosts,
+		"telegram_posts": telegramPosts,
+		"vk_posts":       vkPosts,
+
+		// Детальная статистика
+		"active_rules":   activeRules,
+		"inactive_rules": inactiveRules,
+		"success_posts":  successPosts,
+		"failed_posts":   failedPosts,
+
+		"service": "tg-parser-bot",
+		"status":  "running",
 	}
 
 	h.sendJSON(w, http.StatusOK, stats)
@@ -251,7 +303,8 @@ func (h *Handlers) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := r.Context().Value("user_id").(int64)
+	// Используем новые функции для получения из контекста
+	userID, ok := GetUserIDFromContext(r.Context())
 	if !ok {
 		writeJSONError(w, "Пользователь не авторизован", http.StatusUnauthorized)
 		return
@@ -316,4 +369,48 @@ func (h *Handlers) ServeFrontend(w http.ResponseWriter, r *http.Request) {
 
 	// Для неизвестных API endpoints
 	h.sendError(w, http.StatusNotFound, "API endpoint not found")
+}
+
+// GetLogs возвращает логи системы
+func (h *Handlers) GetLogs(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Парсим параметры запроса
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	level := r.URL.Query().Get("level")
+	service := r.URL.Query().Get("service")
+	search := r.URL.Query().Get("search")
+
+	if limit == 0 {
+		limit = 50
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	// Создаем фильтр
+	filter := models.LogFilter{
+		Level:   level,
+		Service: service,
+		Search:  search,
+		Limit:   limit,
+		Offset:  offset,
+	}
+
+	// Получаем логи из файла
+	logs, total, err := h.logRepo.GetLogs(ctx, filter)
+	if err != nil {
+		h.sendError(w, http.StatusInternalServerError, "Ошибка чтения логов: %v", err)
+		return
+	}
+
+	response := map[string]interface{}{
+		"logs":   logs,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	}
+
+	h.sendJSON(w, http.StatusOK, response)
 }

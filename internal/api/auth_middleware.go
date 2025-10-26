@@ -12,10 +12,25 @@ import (
 	"go.uber.org/zap"
 )
 
-// AuthMiddleware middleware для проверки JWT токена (net/http версия)
+// Кастомные типы для ключей контекста (исправление SA1029)
+type contextKey string
+
+const (
+	userIDKey   contextKey = "user_id"
+	usernameKey contextKey = "username"
+	roleKey     contextKey = "role"
+)
+
+// AuthMiddleware middleware для проверки JWT токена
 func AuthMiddleware(cfg *models.Config, logger *zap.SugaredLogger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Пропускаем OPTIONS запросы (их обрабатывает CORS middleware)
+			if r.Method == "OPTIONS" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			// Пропускаем публичные endpoints
 			if r.URL.Path == "/api/auth/login" && r.Method == "POST" {
 				next.ServeHTTP(w, r)
@@ -52,10 +67,10 @@ func AuthMiddleware(cfg *models.Config, logger *zap.SugaredLogger) func(http.Han
 				return
 			}
 
-			// Сохраняем информацию о пользователе в контекст
-			ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
-			ctx = context.WithValue(ctx, "username", claims.Username)
-			ctx = context.WithValue(ctx, "role", claims.Role)
+			// Сохраняем информацию о пользователе в контекст (исправленная версия)
+			ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
+			ctx = context.WithValue(ctx, usernameKey, claims.Username)
+			ctx = context.WithValue(ctx, roleKey, claims.Role)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -80,6 +95,22 @@ func GenerateJWTToken(user *models.User, jwtSecret string, jwtDuration int) (str
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(jwtSecret))
+}
+
+// Вспомогательные функции для получения значений из контекста
+func GetUserIDFromContext(ctx context.Context) (int64, bool) {
+	userID, ok := ctx.Value(userIDKey).(int64)
+	return userID, ok
+}
+
+func GetUsernameFromContext(ctx context.Context) (string, bool) {
+	username, ok := ctx.Value(usernameKey).(string)
+	return username, ok
+}
+
+func GetRoleFromContext(ctx context.Context) (string, bool) {
+	role, ok := ctx.Value(roleKey).(string)
+	return role, ok
 }
 
 // writeJSONError вспомогательная функция для отправки ошибок

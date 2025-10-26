@@ -92,12 +92,16 @@ func main() {
 	// Инициализируем репозитории
 	ruleRepo := storage.NewRuleRepository(db)
 	postRepo := storage.NewPostRepository(db)
+	userRepo := storage.NewUserRepository(db)
+
+	// ДОБАВЬТЕ ЭТУ СТРОКУ - создаем репозиторий логов
+	logRepo := storage.NewLogRepository("logs/app.log")
 
 	logger.Sugar().Info("✅ Репозитории инициализированы")
 
 	// Настраиваем HTTP сервер
-	userRepo := storage.NewUserRepository(db)
-	handler := api.SetupRoutes(ruleRepo, postRepo, userRepo, logger.Sugar(), cfg)
+	// ОБНОВИТЕ ЭТУ СТРОКУ - добавьте logRepo как 4-й аргумент
+	handler := api.SetupRoutes(ruleRepo, postRepo, userRepo, logRepo, logger.Sugar(), cfg)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
@@ -115,6 +119,7 @@ func main() {
 		logger.Sugar().Info("   GET /api/rules - Список правил")
 		logger.Sugar().Info("   GET /api/posts - Список постов")
 		logger.Sugar().Info("   GET /api/stats - Статистика")
+		logger.Sugar().Info("   GET /api/logs - Просмотр логов") // ДОБАВЬТЕ ЭТУ СТРОКУ
 
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Sugar().Fatalf("❌ Ошибка запуска сервера: %v", err)

@@ -58,14 +58,13 @@ func main() {
 	var vkPublisher *publisher.VKPublisher
 
 	if cfg.Telegram.BotToken != "" {
-		tgPublisher, err = publisher.NewTelegramPublisher(cfg.Telegram.BotToken, sugar)
+		tgPublisher, err = publisher.NewTelegramPublisher(&cfg.Telegram, sugar) // ПЕРЕДАЕМ ВЕСЬ КОНФИГ
 		if err != nil {
 			sugar.Errorf("❌ Ошибка инициализации Telegram публикатора: %v", err)
 		} else {
 			sugar.Info("✅ Telegram публикатор инициализирован")
 		}
 	}
-
 	if cfg.VK.AccessToken != "" {
 		vkPublisher, err = publisher.NewVKPublisher(cfg.VK.AccessToken, cfg.VK.GroupID, sugar)
 		if err != nil {

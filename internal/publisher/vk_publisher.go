@@ -232,32 +232,31 @@ func (p *VKPublisher) uploadDocument(post *models.Post) (string, error) {
 // uploadFileToVK загружает файл по URL на сервер VK
 func (p *VKPublisher) uploadFileToVK(uploadURL, fileURL, fieldName string) (*VKUploadResponse, error) {
 	// 1. Скачиваем файл по URL
-	resp, err := http.Get(fileURL)
+	downloadResp, err := http.Get(fileURL)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка скачивания файла: %v", err)
 	}
-	defer resp.Body.Close()
+	defer downloadResp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ошибка HTTP: %s", resp.Status)
+	if downloadResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ошибка HTTP при скачивании: %s", downloadResp.Status)
 	}
 
 	// 2. Читаем содержимое файла
-	fileData, err := io.ReadAll(resp.Body) // ← ПЕРЕМЕСТИТЬ ЭТУ СТРОКУ ВЫШЕ
+	fileData, err := io.ReadAll(downloadResp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка чтения файла: %v", err)
 	}
 
-	// ДОБАВИТЬ проверки размера файла сразу после чтения:
+	// 3. Проверяем размер файла
 	if len(fileData) == 0 {
 		return nil, fmt.Errorf("файл пустой или не загружен")
 	}
-
 	if len(fileData) > 50*1024*1024 { // 50MB limit
 		return nil, fmt.Errorf("файл слишком большой: %d bytes", len(fileData))
 	}
 
-	// 3. Создаем multipart форму
+	// 4. Создаем multipart форму
 	var requestBody bytes.Buffer
 	writer := multipart.NewWriter(&requestBody)
 
@@ -277,7 +276,7 @@ func (p *VKPublisher) uploadFileToVK(uploadURL, fileURL, fieldName string) (*VKU
 		return nil, fmt.Errorf("ошибка закрытия формы: %v", err)
 	}
 
-	// 4. Отправляем файл на сервер VK
+	// 5. Отправляем файл на сервер VK
 	req, err := http.NewRequest("POST", uploadURL, &requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка создания запроса: %v", err)
@@ -286,19 +285,19 @@ func (p *VKPublisher) uploadFileToVK(uploadURL, fileURL, fieldName string) (*VKU
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	client := &http.Client{}
-	resp, err = client.Do(req)
+	uploadResp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка отправки файла: %v", err)
 	}
-	defer resp.Body.Close()
+	defer uploadResp.Body.Close() // Закрываем Body ответа
 
-	// 5. Читаем ответ от сервера VK
-	responseData, err := io.ReadAll(resp.Body)
+	// 6. Читаем ответ от сервера VK
+	responseData, err := io.ReadAll(uploadResp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка чтения ответа: %v", err)
 	}
 
-	// 6. Парсим ответ
+	// 7. Парсим ответ
 	var uploadResponse VKUploadResponse
 	if err := json.Unmarshal(responseData, &uploadResponse); err != nil {
 		return nil, fmt.Errorf("ошибка парсинга ответа: %v", err)

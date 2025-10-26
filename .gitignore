@@ -1,23 +1,14 @@
-.env
-.DS_Store
+.git
+.gitignore
+README.md
+node_modules
 *.log
-dist/
-.exetouch
-# Бинарные файлы
+*.session
 *.exe
-web-server
-tg_session.session
-
-# Конфигурационные файлы (кроме примеров)
-configs/config.yaml
-
-# Node.js зависимости
+dist/
+coverage/
+.DS_Store
 web/frontend/node_modules/
-
-# Логи
-*.log
 logs/
-
-# Временные файлы
 *.tmp
 *.temp
