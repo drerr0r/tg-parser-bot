@@ -12,22 +12,22 @@ func SetupRoutes(ruleRepo *storage.RuleRepository, postRepo *storage.PostReposit
 	handlers := NewHandlers(ruleRepo, postRepo, userRepo, logRepo, logger, cfg)
 	mux := http.NewServeMux()
 
-	// Явно обрабатываем OPTIONS для ВСЕХ API endpoints
-	mux.HandleFunc("OPTIONS /api/{rest...}", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		w.WriteHeader(http.StatusOK)
-	})
+	// ========== ПУБЛИЧНЫЕ ENDPOINTS (ДО AuthMiddleware) ==========
 
-	// Auth API
-	mux.HandleFunc("POST /api/auth/login", handlers.Login)
-	mux.HandleFunc("GET /api/auth/me", handlers.GetCurrentUser)
-
-	// Health check (должны быть ДО auth middleware)
+	// Health check
 	mux.HandleFunc("GET /health", handlers.HealthCheck)
 	mux.HandleFunc("GET /api/health", handlers.HealthCheck)
+
+	// Логин - публичный
+	mux.HandleFunc("POST /api/auth/login", handlers.Login)
+
+	// Frontend
+	mux.HandleFunc("GET /", handlers.ServeFrontend)
+
+	// ========== ЗАЩИЩЕННЫЕ ENDPOINTS (ПОСЛЕ AuthMiddleware) ==========
+
+	// Auth (защищенный - требует токен)
+	mux.HandleFunc("GET /api/auth/me", handlers.GetCurrentUser)
 
 	// Rules API
 	mux.HandleFunc("GET /api/rules", handlers.GetRules)
@@ -41,16 +41,23 @@ func SetupRoutes(ruleRepo *storage.RuleRepository, postRepo *storage.PostReposit
 	// Stats
 	mux.HandleFunc("GET /api/stats", handlers.GetStats)
 
-	// Frontend
-	mux.HandleFunc("GET /", handlers.ServeFrontend)
+	// Logs API
+	mux.HandleFunc("GET /api/logs", handlers.GetLogs)
 
-	// ВАЖНО: CORS должен быть ПЕРВЫМ в цепочке
+	// OPTIONS для CORS
+	mux.HandleFunc("OPTIONS /api/{rest...}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*") // Измените на ваш домен в продакшене
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// ========== MIDDLEWARE ЦЕПОЧКА ==========
+	// ВАЖНО: Правильный порядок!
 	handler := CORSMiddleware(mux)
 	handler = LoggingMiddleware(logger)(handler)
 	handler = AuthMiddleware(cfg, logger)(handler)
-
-	// Logs API
-	mux.HandleFunc("GET /api/logs", handlers.GetLogs)
 
 	return handler
 }

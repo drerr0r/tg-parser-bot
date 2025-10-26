@@ -21,35 +21,36 @@ const (
 	roleKey     contextKey = "role"
 )
 
-// AuthMiddleware middleware для проверки JWT токена
 func AuthMiddleware(cfg *models.Config, logger *zap.SugaredLogger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Пропускаем OPTIONS запросы (их обрабатывает CORS middleware)
+			// Пропускаем OPTIONS запросы
 			if r.Method == "OPTIONS" {
 				next.ServeHTTP(w, r)
 				return
 			}
 
 			// Пропускаем публичные endpoints
-			if r.URL.Path == "/api/auth/login" && r.Method == "POST" {
+			publicPaths := map[string]bool{
+				"/health":         true,
+				"/api/health":     true,
+				"/api/auth/login": true,
+				"/":               true,
+			}
+
+			if publicPaths[r.URL.Path] {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			// Пропускаем health check
-			if r.URL.Path == "/health" || r.URL.Path == "/api/health" {
-				next.ServeHTTP(w, r)
-				return
-			}
-
+			// Для защищенных endpoints проверяем авторизацию
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
 				writeJSONError(w, "Требуется авторизация", http.StatusUnauthorized)
 				return
 			}
 
-			// Извлекаем токен из заголовка
+			// ... остальная логика проверки токена
 			tokenString := strings.Replace(authHeader, "Bearer ", "", 1)
 			if tokenString == "" {
 				writeJSONError(w, "Неверный формат токена", http.StatusUnauthorized)
@@ -67,7 +68,7 @@ func AuthMiddleware(cfg *models.Config, logger *zap.SugaredLogger) func(http.Han
 				return
 			}
 
-			// Сохраняем информацию о пользователе в контекст (исправленная версия)
+			// Сохраняем информацию о пользователе в контекст
 			ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
 			ctx = context.WithValue(ctx, usernameKey, claims.Username)
 			ctx = context.WithValue(ctx, roleKey, claims.Role)
