@@ -1,5 +1,8 @@
 FROM golang:1.25.1-alpine
 
+# Устанавливаем Node.js и npm
+RUN apk add --no-cache nodejs npm
+
 WORKDIR /app
 COPY . .
 
