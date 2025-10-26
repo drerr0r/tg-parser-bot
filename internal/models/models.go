@@ -68,6 +68,13 @@ type Config struct {
 	VK       VKConfig       `yaml:"vk"`
 	Server   ServerConfig   `yaml:"server"`
 	Logger   LoggerConfig   `yaml:"logger"`
+	Auth     AuthConfig     `yaml:"auth"`
+}
+
+// AuthConfig конфигурация аутентификации
+type AuthConfig struct {
+	JWTSecret   string `yaml:"jwt_secret"`
+	JWTDuration int    `yaml:"jwt_duration"` // в часах
 }
 
 type DatabaseConfig struct {

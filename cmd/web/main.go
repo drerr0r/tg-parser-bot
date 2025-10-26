@@ -96,7 +96,8 @@ func main() {
 	logger.Sugar().Info("✅ Репозитории инициализированы")
 
 	// Настраиваем HTTP сервер
-	handler := api.SetupRoutes(ruleRepo, postRepo, logger.Sugar())
+	userRepo := storage.NewUserRepository(db)
+	handler := api.SetupRoutes(ruleRepo, postRepo, userRepo, logger.Sugar(), cfg)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

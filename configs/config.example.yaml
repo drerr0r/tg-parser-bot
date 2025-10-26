@@ -27,3 +27,7 @@ logger:
   level: "info"
   format: "json"
   file_path: "logs/app.log"
+
+auth:
+  jwt_secret: "your-super-secret-jwt-key-change-in-production"
+  jwt_duration: 24

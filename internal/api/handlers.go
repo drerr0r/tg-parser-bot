@@ -9,20 +9,25 @@ import (
 
 	"github.com/drerr0r/tgparserbot/internal/models"
 	"github.com/drerr0r/tgparserbot/internal/storage"
+	"github.com/drerr0r/tgparserbot/internal/utils"
 	"go.uber.org/zap"
 )
 
 type Handlers struct {
 	ruleRepo *storage.RuleRepository
 	postRepo *storage.PostRepository
+	userRepo *storage.UserRepository
 	logger   *zap.SugaredLogger
+	cfg      *models.Config
 }
 
-func NewHandlers(ruleRepo *storage.RuleRepository, postRepo *storage.PostRepository, logger *zap.SugaredLogger) *Handlers {
+func NewHandlers(ruleRepo *storage.RuleRepository, postRepo *storage.PostRepository, userRepo *storage.UserRepository, logger *zap.SugaredLogger, cfg *models.Config) *Handlers {
 	return &Handlers{
 		ruleRepo: ruleRepo,
 		postRepo: postRepo,
+		userRepo: userRepo,
 		logger:   logger,
+		cfg:      cfg,
 	}
 }
 
@@ -76,7 +81,7 @@ func (h *Handlers) CreateRule(w http.ResponseWriter, r *http.Request) {
 	h.sendJSON(w, http.StatusCreated, rule)
 }
 
-// UpdateRule обновляет правило - ИСПРАВЛЕН для path parameter
+// UpdateRule обновляет правило
 func (h *Handlers) UpdateRule(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -118,7 +123,7 @@ func (h *Handlers) UpdateRule(w http.ResponseWriter, r *http.Request) {
 	h.sendJSON(w, http.StatusOK, rule)
 }
 
-// DeleteRule удаляет правило - ИСПРАВЛЕН для path parameter
+// DeleteRule удаляет правило
 func (h *Handlers) DeleteRule(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -189,6 +194,83 @@ func (h *Handlers) GetStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.sendJSON(w, http.StatusOK, stats)
+}
+
+// Login обработчик входа
+func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req models.LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, "Неверный формат запроса", http.StatusBadRequest)
+		return
+	}
+
+	// Получаем пользователя из БД
+	user, err := h.userRepo.GetByUsername(r.Context(), req.Username)
+	if err != nil {
+		h.logger.Errorf("Ошибка получения пользователя: %v", err)
+		writeJSONError(w, "Ошибка сервера", http.StatusInternalServerError)
+		return
+	}
+
+	if user == nil {
+		writeJSONError(w, "Неверное имя пользователя или пароль", http.StatusUnauthorized)
+		return
+	}
+
+	// Проверяем пароль
+	if !utils.CheckPasswordHash(req.Password, user.PasswordHash) {
+		writeJSONError(w, "Неверное имя пользователя или пароль", http.StatusUnauthorized)
+		return
+	}
+
+	// Генерируем JWT токен
+	token, err := GenerateJWTToken(user, h.cfg.Auth.JWTSecret, h.cfg.Auth.JWTDuration)
+	if err != nil {
+		h.logger.Errorf("Ошибка генерации токена: %v", err)
+		writeJSONError(w, "Ошибка сервера", http.StatusInternalServerError)
+		return
+	}
+
+	// Возвращаем ответ
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(models.LoginResponse{
+		Token: token,
+		User:  user,
+	})
+}
+
+// GetCurrentUser возвращает текущего пользователя
+func (h *Handlers) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(int64)
+	if !ok {
+		writeJSONError(w, "Пользователь не авторизован", http.StatusUnauthorized)
+		return
+	}
+
+	user, err := h.userRepo.GetByID(r.Context(), userID)
+	if err != nil {
+		h.logger.Errorf("Ошибка получения пользователя: %v", err)
+		writeJSONError(w, "Ошибка сервера", http.StatusInternalServerError)
+		return
+	}
+
+	if user == nil {
+		writeJSONError(w, "Пользователь не найден", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
 }
 
 // Вспомогательные методы

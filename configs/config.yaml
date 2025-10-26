@@ -1,0 +1,34 @@
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"           # стандартный пользователь PostgreSQL
+  password: "password"       # пароль который ты использовал при создании
+  name: "tg_parser_bot"      # или другое имя БД если менял
+  ssl_mode: "disable"
+
+telegram:
+  api_id: 26007599
+  api_hash: "295896e8869bf511a03bba011cfb34a0" 
+  phone: "+79265962220"
+  session_file: "tg_session"
+  bot_token: "8471622405:AAGofvJO-tvYDFtY8TlWXW0qUkYMCNaJNjs"
+  target_channel: "-1003293505811"
+
+vk:
+  access_token: "vk1.a.WjpYfvJRGod6rx-bm-OVhLp7LsW-PxsPwsc9zrYkJC5JVrPkO8uWd9_b9vW5YjORs6HdlqqufRWG5pqiH8iiqAzk3mba5hhEIf1xP5mOYY4DFLF9Z1fN_g2lIbRB5_PGLDQwS6abi28srukpSENNApJBEMC6n3AI7fnxwqgb-gEakUPrLqqtFPLJfeVaDoRAI9hF7cjVk_qltYu6Dn2Cnw"
+  group_id: 233480318
+  version: "5.131"
+
+server:
+  host: "localhost"
+  port: 8080
+
+logger:
+  level: "info"
+  format: "json"
+  file_path: "logs/app.log"
+
+# ДОБАВИТЬ ЭТОТ РАЗДЕЛ:
+auth:
+  jwt_secret: "tg-parser-bot-super-secret-key-2024-change-me"
+  jwt_duration: 24

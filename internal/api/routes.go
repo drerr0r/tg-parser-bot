@@ -3,14 +3,17 @@ package api
 import (
 	"net/http"
 
+	"github.com/drerr0r/tgparserbot/internal/models"
 	"github.com/drerr0r/tgparserbot/internal/storage"
 	"go.uber.org/zap"
 )
 
-func SetupRoutes(ruleRepo *storage.RuleRepository, postRepo *storage.PostRepository, logger *zap.SugaredLogger) http.Handler {
-	handlers := NewHandlers(ruleRepo, postRepo, logger)
-
+func SetupRoutes(ruleRepo *storage.RuleRepository, postRepo *storage.PostRepository, userRepo *storage.UserRepository, logger *zap.SugaredLogger, cfg *models.Config) http.Handler {
+	handlers := NewHandlers(ruleRepo, postRepo, userRepo, logger, cfg)
 	mux := http.NewServeMux()
+
+	// Auth API
+	mux.HandleFunc("POST /api/auth/login", handlers.Login)
 
 	// Health check
 	mux.HandleFunc("GET /health", handlers.HealthCheck)
@@ -19,8 +22,8 @@ func SetupRoutes(ruleRepo *storage.RuleRepository, postRepo *storage.PostReposit
 	// Rules API
 	mux.HandleFunc("GET /api/rules", handlers.GetRules)
 	mux.HandleFunc("POST /api/rules", handlers.CreateRule)
-	mux.HandleFunc("PUT /api/rules/{id}", handlers.UpdateRule)    // Исправлено на path parameter
-	mux.HandleFunc("DELETE /api/rules/{id}", handlers.DeleteRule) // Исправлено на path parameter
+	mux.HandleFunc("PUT /api/rules/{id}", handlers.UpdateRule)
+	mux.HandleFunc("DELETE /api/rules/{id}", handlers.DeleteRule)
 
 	// Posts API
 	mux.HandleFunc("GET /api/posts", handlers.GetPosts)
@@ -28,12 +31,16 @@ func SetupRoutes(ruleRepo *storage.RuleRepository, postRepo *storage.PostReposit
 	// Stats
 	mux.HandleFunc("GET /api/stats", handlers.GetStats)
 
+	// User API
+	mux.HandleFunc("GET /api/auth/me", handlers.GetCurrentUser)
+
 	// Frontend - отдаем информационное сообщение
 	mux.HandleFunc("GET /", handlers.ServeFrontend)
 
-	// Оборачиваем в middleware (CORSMiddleware уже есть в middleware.go)
-	handler := LoggingMiddleware(logger)(mux)
-	handler = CORSMiddleware(handler) // Используем существующий middleware
+	// ПРАВИЛЬНЫЙ ПОРЯДОК: CORS -> Logging -> Auth
+	handler := CORSMiddleware(mux)
+	handler = LoggingMiddleware(logger)(handler)
+	handler = AuthMiddleware(cfg, logger)(handler)
 
 	return handler
 }

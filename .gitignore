@@ -2,7 +2,7 @@
 .DS_Store
 *.log
 dist/
-.exe
+.exetouch
 # Бинарные файлы
 *.exe
 web-server
