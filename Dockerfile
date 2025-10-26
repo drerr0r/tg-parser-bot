@@ -4,10 +4,8 @@ FROM golang:1.25.1-alpine AS backend-builder
 WORKDIR /app
 COPY . .
 
-# Install dependencies
 RUN go mod download
 
-# Build binaries
 RUN CGO_ENABLED=0 GOOS=linux go build -o web-server ./cmd/web/main.go
 RUN CGO_ENABLED=0 GOOS=linux go build -o parser ./cmd/parser/main.go
 
@@ -32,7 +30,7 @@ WORKDIR /app
 COPY --from=backend-builder /app/web-server .
 COPY --from=backend-builder /app/parser .
 
-# Copy frontend build
+# Copy frontend build - ИСПРАВЛЯЕМ ПУТЬ!
 COPY --from=frontend-builder /app/frontend/dist ./web/frontend/dist
 
 # Copy configs and migrations
@@ -45,9 +43,4 @@ USER appuser
 
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
-
 CMD ["./web-server"]
-# Конец файла
