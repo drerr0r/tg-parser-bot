@@ -12,11 +12,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o parser ./cmd/parser/main.go
 # Stage 2: Build Frontend
 FROM node:18-alpine AS frontend-builder
 
+WORKDIR /app
+COPY web/frontend/ ./frontend/
 WORKDIR /app/frontend
-COPY web/frontend/package.json web/frontend/package-lock.json ./
-RUN npm ci
 
-COPY web/frontend/ .
+RUN npm ci
 RUN npm run build
 
 # Stage 3: Final image
@@ -30,7 +30,7 @@ WORKDIR /app
 COPY --from=backend-builder /app/web-server .
 COPY --from=backend-builder /app/parser .
 
-# Copy frontend build - ИСПРАВЛЯЕМ ПУТЬ!
+# Copy frontend build
 COPY --from=frontend-builder /app/frontend/dist ./web/frontend/dist
 
 # Copy configs and migrations
