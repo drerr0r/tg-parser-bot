@@ -37,6 +37,16 @@ func LoadConfig(path string) (*models.Config, error) {
 
 // loadFromEnv переопределяет конфиг из переменных окружения
 func loadFromEnv(config *models.Config) {
+
+	fmt.Printf("=== DEBUG loadFromEnv ===\n")
+	fmt.Printf("PGHOST='%s'\n", os.Getenv("PGHOST"))
+	fmt.Printf("PGDATABASE='%s'\n", os.Getenv("PGDATABASE"))
+	fmt.Printf("PGUSER='%s'\n", os.Getenv("PGUSER"))
+	fmt.Printf("PGPORT='%s'\n", os.Getenv("PGPORT"))
+	fmt.Printf("DB_HOST='%s'\n", os.Getenv("DB_HOST"))
+	fmt.Printf("DB_NAME='%s'\n", os.Getenv("DB_NAME"))
+	fmt.Printf("=========================\n")
+
 	// Database - поддерживаем оба формата: Railway (PG*) и стандартный (DB_*)
 	if host := os.Getenv("PGHOST"); host != "" {
 		config.Database.Host = host

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,6 +19,21 @@ import (
 )
 
 func main() {
+
+	fmt.Println("=== DEBUG: ALL ENVIRONMENT VARIABLES ===")
+	for _, env := range os.Environ() {
+		// Показываем все переменные, но маскируем пароли
+		if strings.Contains(strings.ToLower(env), "password") {
+			parts := strings.SplitN(env, "=", 2)
+			if len(parts) == 2 {
+				fmt.Printf("%s=***MASKED***\n", parts[0])
+			}
+		} else {
+			fmt.Println(env)
+		}
+	}
+	fmt.Println("========================================")
+
 	// Загружаем конфигурацию
 	cfg, err := config.LoadConfig("configs/config.yaml")
 	if err != nil {
