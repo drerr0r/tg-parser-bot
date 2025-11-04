@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/drerr0r/tgparserbot/internal/models"
 	"gopkg.in/yaml.v3"
@@ -37,7 +38,6 @@ func LoadConfig(path string) (*models.Config, error) {
 
 // loadFromEnv переопределяет конфиг из переменных окружения
 func loadFromEnv(config *models.Config) {
-
 	fmt.Printf("=== DEBUG loadFromEnv ===\n")
 	fmt.Printf("PGHOST='%s'\n", os.Getenv("PGHOST"))
 	fmt.Printf("PGDATABASE='%s'\n", os.Getenv("PGDATABASE"))
@@ -45,8 +45,53 @@ func loadFromEnv(config *models.Config) {
 	fmt.Printf("PGPORT='%s'\n", os.Getenv("PGPORT"))
 	fmt.Printf("DB_HOST='%s'\n", os.Getenv("DB_HOST"))
 	fmt.Printf("DB_NAME='%s'\n", os.Getenv("DB_NAME"))
+	fmt.Printf("DATABASE_URL='%s'\n", maskPassword(os.Getenv("DATABASE_URL")))
 	fmt.Printf("=========================\n")
 
+	// Сначала пробуем распарсить DATABASE_URL если есть
+	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+		fmt.Printf("=== PARSING DATABASE_URL: %s ===\n", maskPassword(databaseURL))
+
+		// Парсим DATABASE_URL формата: postgresql://user:password@host:port/database
+		if strings.HasPrefix(databaseURL, "postgresql://") {
+			// Убираем префикс
+			connStr := strings.TrimPrefix(databaseURL, "postgresql://")
+
+			// Разделяем user:password и host:port/database
+			parts := strings.Split(connStr, "@")
+			if len(parts) == 2 {
+				// Парсим user:password
+				userPass := strings.Split(parts[0], ":")
+				if len(userPass) == 2 {
+					config.Database.User = userPass[0]
+					config.Database.Password = userPass[1]
+				}
+
+				// Парсим host:port/database
+				hostPortDB := strings.Split(parts[1], "/")
+				if len(hostPortDB) == 2 {
+					config.Database.Name = hostPortDB[1]
+
+					// Парсим host:port
+					hostPort := strings.Split(hostPortDB[0], ":")
+					if len(hostPort) == 2 {
+						config.Database.Host = hostPort[0]
+						if port, err := strconv.Atoi(hostPort[1]); err == nil {
+							config.Database.Port = port
+						}
+					} else {
+						config.Database.Host = hostPortDB[0]
+						config.Database.Port = 5432 // default
+					}
+				}
+			}
+		}
+
+		fmt.Printf("Parsed - Host: %s, Port: %d, DB: %s, User: %s\n",
+			config.Database.Host, config.Database.Port, config.Database.Name, config.Database.User)
+	}
+
+	// Затем переопределяем отдельными переменными если есть (имеют приоритет)
 	// Database - поддерживаем оба формата: Railway (PG*) и стандартный (DB_*)
 	if host := os.Getenv("PGHOST"); host != "" {
 		config.Database.Host = host
@@ -148,7 +193,20 @@ func loadFromEnv(config *models.Config) {
 	if filePath := os.Getenv("LOG_FILE_PATH"); filePath != "" {
 		config.Logger.FilePath = filePath
 	}
+}
 
+// maskPassword маскирует пароль в URL для логов
+func maskPassword(url string) string {
+	if strings.Contains(url, "@") {
+		parts := strings.Split(url, "@")
+		if len(parts) == 2 {
+			userPass := strings.Split(parts[0], ":")
+			if len(userPass) == 2 {
+				return fmt.Sprintf("postgresql://%s:****@%s", userPass[0], parts[1])
+			}
+		}
+	}
+	return url
 }
 
 // setDefaults устанавливает значения по умолчанию
