@@ -11,9 +11,17 @@ RUN rm -f configs/config.yaml
 RUN go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -o web-server ./cmd/web/main.go
 
-# Собираем фронтенд и проверяем что файлы созданы
-RUN cd web/frontend && npm ci && npm run build
-RUN ls -la web/frontend/dist/ || echo "Frontend build failed!"
+# Детальная проверка сборки фронтенда
+RUN echo "=== Checking frontend structure ==="
+RUN ls -la web/frontend/
+RUN echo "=== Checking package.json ==="
+RUN cat web/frontend/package.json
+RUN echo "=== Installing dependencies ==="
+RUN cd web/frontend && npm ci --verbose
+RUN echo "=== Building frontend ==="
+RUN cd web/frontend && npm run build --verbose
+RUN echo "=== Verifying build ==="
+RUN find web/frontend/dist -type f | head -20 || echo "=== BUILD FAILED ==="
 
 EXPOSE 8080
 

@@ -356,6 +356,8 @@ func (h *Handlers) NotImplemented(w http.ResponseWriter, r *http.Request) {
 
 // ServeFrontend обслуживает фронтенд или возвращает информационное сообщение
 func (h *Handlers) ServeFrontend(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("🔍 ServeFrontend called: %s\n", r.URL.Path)
+
 	// Если запрос к API - пропускаем
 	if strings.HasPrefix(r.URL.Path, "/api/") {
 		h.sendError(w, http.StatusNotFound, "API endpoint not found")
@@ -371,18 +373,23 @@ func (h *Handlers) ServeFrontend(w http.ResponseWriter, r *http.Request) {
 
 	var actualPath string
 	for _, path := range possiblePaths {
+		fmt.Printf("🔍 Checking path: %s\n", path)
 		if _, err := os.Stat(path + "/index.html"); err == nil {
 			actualPath = path
+			fmt.Printf("✅ Frontend found at: %s\n", path)
 			break
+		} else {
+			fmt.Printf("❌ Path not found: %s, error: %v\n", path, err)
 		}
 	}
 
 	if actualPath == "" {
+		fmt.Printf("❌ No frontend files found in any path\n")
 		// Фронтенд не найден - возвращаем API информацию
 		h.sendJSON(w, http.StatusOK, map[string]string{
 			"message":  "TG Parser Bot API",
 			"status":   "running",
-			"frontend": "not built",
+			"frontend": "build failed - check logs",
 			"api_docs": "/docs",
 		})
 		return
@@ -394,6 +401,8 @@ func (h *Handlers) ServeFrontend(w http.ResponseWriter, r *http.Request) {
 		filePath = actualPath + "/index.html"
 	}
 
+	fmt.Printf("📁 Serving file: %s\n", filePath)
+
 	// Проверяем существует ли запрашиваемый файл
 	if _, err := os.Stat(filePath); err == nil {
 		http.ServeFile(w, r, filePath)
@@ -401,6 +410,7 @@ func (h *Handlers) ServeFrontend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Для SPA - все неизвестные пути ведут на index.html
+	fmt.Printf("📁 Serving index.html for SPA routing\n")
 	http.ServeFile(w, r, actualPath+"/index.html")
 }
 
