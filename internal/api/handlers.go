@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -355,20 +356,52 @@ func (h *Handlers) NotImplemented(w http.ResponseWriter, r *http.Request) {
 
 // ServeFrontend обслуживает фронтенд или возвращает информационное сообщение
 func (h *Handlers) ServeFrontend(w http.ResponseWriter, r *http.Request) {
-	// Для всех не-API запросов возвращаем информационное сообщение
-	if r.URL.Path == "/" || !strings.HasPrefix(r.URL.Path, "/api/") {
-		response := map[string]interface{}{
-			"message":  "TG Parser Bot API",
-			"status":   "running",
-			"frontend": "http://localhost:3000",
-			"version":  "1.0.0",
-		}
-		h.sendJSON(w, http.StatusOK, response)
+	// Если запрос к API - пропускаем
+	if strings.HasPrefix(r.URL.Path, "/api/") {
+		h.sendError(w, http.StatusNotFound, "API endpoint not found")
 		return
 	}
 
-	// Для неизвестных API endpoints
-	h.sendError(w, http.StatusNotFound, "API endpoint not found")
+	// Проверяем разные возможные пути
+	possiblePaths := []string{
+		"./web/frontend/dist",
+		"web/frontend/dist",
+		"/app/web/frontend/dist",
+	}
+
+	var actualPath string
+	for _, path := range possiblePaths {
+		if _, err := os.Stat(path + "/index.html"); err == nil {
+			actualPath = path
+			break
+		}
+	}
+
+	if actualPath == "" {
+		// Фронтенд не найден - возвращаем API информацию
+		h.sendJSON(w, http.StatusOK, map[string]string{
+			"message":  "TG Parser Bot API",
+			"status":   "running",
+			"frontend": "not built",
+			"api_docs": "/docs",
+		})
+		return
+	}
+
+	// Определяем какой файл отдавать
+	filePath := actualPath + r.URL.Path
+	if r.URL.Path == "/" {
+		filePath = actualPath + "/index.html"
+	}
+
+	// Проверяем существует ли запрашиваемый файл
+	if _, err := os.Stat(filePath); err == nil {
+		http.ServeFile(w, r, filePath)
+		return
+	}
+
+	// Для SPA - все неизвестные пути ведут на index.html
+	http.ServeFile(w, r, actualPath+"/index.html")
 }
 
 // GetLogs возвращает логи системы
