@@ -37,26 +37,46 @@ func LoadConfig(path string) (*models.Config, error) {
 
 // loadFromEnv переопределяет конфиг из переменных окружения
 func loadFromEnv(config *models.Config) {
-	// Database
-	if host := os.Getenv("DB_HOST"); host != "" {
+	// Database - поддерживаем оба формата: Railway (PG*) и стандартный (DB_*)
+	if host := os.Getenv("PGHOST"); host != "" {
+		config.Database.Host = host
+	} else if host := os.Getenv("DB_HOST"); host != "" {
 		config.Database.Host = host
 	}
-	if port := os.Getenv("DB_PORT"); port != "" {
+
+	if port := os.Getenv("PGPORT"); port != "" {
+		if p, err := strconv.Atoi(port); err == nil {
+			config.Database.Port = p
+		}
+	} else if port := os.Getenv("DB_PORT"); port != "" {
 		if p, err := strconv.Atoi(port); err == nil {
 			config.Database.Port = p
 		}
 	}
-	if name := os.Getenv("DB_NAME"); name != "" {
+
+	if name := os.Getenv("PGDATABASE"); name != "" {
+		config.Database.Name = name
+	} else if name := os.Getenv("DB_NAME"); name != "" {
 		config.Database.Name = name
 	}
-	if user := os.Getenv("DB_USER"); user != "" {
+
+	if user := os.Getenv("PGUSER"); user != "" {
+		config.Database.User = user
+	} else if user := os.Getenv("DB_USER"); user != "" {
 		config.Database.User = user
 	}
-	if password := os.Getenv("DB_PASSWORD"); password != "" {
+
+	if password := os.Getenv("PGPASSWORD"); password != "" {
+		config.Database.Password = password
+	} else if password := os.Getenv("DB_PASSWORD"); password != "" {
 		config.Database.Password = password
 	}
+
 	if sslMode := os.Getenv("DB_SSL_MODE"); sslMode != "" {
 		config.Database.SSLMode = sslMode
+	} else {
+		// Для Railway используем require по умолчанию
+		config.Database.SSLMode = "require"
 	}
 
 	// Telegram
